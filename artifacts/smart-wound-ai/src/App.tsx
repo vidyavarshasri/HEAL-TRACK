@@ -6,8 +6,8 @@ import { shadcn } from '@clerk/themes';
 import {
   Activity, ArrowDownRight, ArrowLeft, ArrowRight, CalendarDays,
   Camera, Check, CheckCircle2, ChevronRight, CircleAlert, Clipboard, Clock3,
-  HeartPulse, LockKeyhole, LogOut, MapPin, Plus, Shield, ShieldCheck,
-  Stethoscope, X,
+  HeartPulse, ImagePlus, LockKeyhole, LogOut, MapPin, Mic, MicOff, Plus,
+  Shield, ShieldCheck, Stethoscope, X,
 } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getGetWoundQueryKey, getListWoundUpdatesQueryKey,
@@ -86,6 +86,73 @@ const riskLabel = (risk: string) => ({
 const symptomLabel: Record<SymptomLevel, string> = {
   none: 'None', mild: 'Mild', moderate: 'Moderate', severe: 'Severe', unknown: 'Unsure',
 };
+
+type SpeechRecognitionResult = { isFinal: boolean; 0: { transcript: string } };
+type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechRecognitionResult> };
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+function WoundCareGuidance() {
+  return <section className="surface p-5 md:p-6" aria-labelledby="wound-care-guidance-title">
+    <div className="flex items-start gap-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f0eb] text-[#2c6d64]"><Stethoscope size={19} /></span>
+      <div>
+        <p className="eyebrow">General information</p>
+        <h2 id="wound-care-guidance-title" className="display mt-1 text-xl font-bold">Wound care &amp; warning signs</h2>
+        <p className="mt-2 text-sm leading-relaxed text-[hsl(var(--muted-foreground))]">For a minor cut or scrape, wash your hands, gently rinse the wound with clean running water and mild soap, apply firm direct pressure with clean gauze if it is bleeding, and cover it with a clean dressing. Follow a clinician’s instructions for larger or deeper wounds.</p>
+      </div>
+    </div>
+    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <div className="rounded-xl bg-[#f4f1e8] p-4">
+        <h3 className="text-sm font-bold text-[#203a39]">Contact a healthcare professional</h3>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-[#5f706a]">
+          <li>Redness, warmth, swelling, or pain is increasing; there is pus, a red streak, or fever.</li>
+          <li>The wound is deep or large, from a bite or puncture, has something embedded, or affects feeling or movement.</li>
+          <li>Ask whether tetanus vaccination is up to date, especially after a dirty or puncture wound.</li>
+        </ul>
+      </div>
+      <div className="rounded-xl bg-[#f8f0e2] p-4">
+        <h3 className="text-sm font-bold text-[#725c40]">Get urgent or emergency help</h3>
+        <p className="mt-2 text-xs leading-relaxed text-[#725c40]">Seek urgent help for severe bleeding that does not stop with firm, direct pressure, rapidly worsening symptoms, loss of feeling or function, or if the person seems seriously unwell. Use your local emergency number when needed.</p>
+      </div>
+    </div>
+    <p className="mt-4 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">This is general first-aid information, not personalized medical advice. The app cannot examine wounds or confirm that one is safe. <a className="font-semibold text-[hsl(var(--primary))] underline underline-offset-2" href="https://medlineplus.gov/ency/article/000043.htm" target="_blank" rel="noreferrer">Read MedlinePlus: cuts and puncture wounds</a>.</p>
+  </section>;
+}
+
+function RiskNextStep({ level }: { level: string }) {
+  const guidance: Record<string, { title: string; text: string }> = {
+    urgent: {
+      title: 'Seek urgent medical help now',
+      text: 'This combination of reported symptoms needs prompt professional assessment. If you feel seriously unwell or have severe bleeding, contact local emergency services.',
+    },
+    clinical_review: {
+      title: 'Contact a healthcare professional promptly',
+      text: 'One or more warning symptoms were recorded. A clinician can assess what is happening and advise you on care.',
+    },
+    monitor: {
+      title: 'Keep tracking changes',
+      text: 'A symptom change was recorded. Contact a healthcare professional if it worsens, new warning signs appear, or you are concerned.',
+    },
+    stable: {
+      title: 'No listed warning symptoms were selected',
+      text: 'This does not confirm that a wound is safe. Seek professional advice if you have concerns or notice a change.',
+    },
+  };
+  const item = guidance[level] ?? guidance.monitor;
+  return <div className={`mt-3 rounded-lg p-3 text-xs leading-relaxed ${level === 'urgent' || level === 'clinical_review' ? 'bg-[#f8e9e5] text-[#803a34]' : 'bg-[#f4f1e8] text-[#5f706a]'}`} role="note">
+    <b className="block">{item.title}</b>{item.text}
+  </div>;
+}
 
 function Brand({ light = false }: { light?: boolean }) {
   return <Link href="/" className={`brand-lockup ${light ? 'brand-light' : ''}`} aria-label="Smart Wound AI home">
@@ -238,6 +305,7 @@ function DashboardPage() {
       {query.isSuccess && dashboard && dashboard.wounds.length > 0 && <div className="grid gap-3">{dashboard.wounds.slice(0, 4).map(wound => <WoundCard wound={wound} key={wound.id} />)}</div>}
     </div>
     <div className="mt-8 flex gap-3 rounded-2xl border border-[#e6d8c3] bg-[#f8f0e2] p-4 text-sm leading-relaxed text-[#725c40]"><CircleAlert size={18} className="mt-0.5 shrink-0" /><p><b>Important:</b> Symptom prompts are decision-support only, not a diagnosis. Contact a healthcare professional if you have concerns. For a medical emergency, call your local emergency number.</p></div>
+     <div className="mt-6"><WoundCareGuidance /></div>
   </PageFrame>;
 }
 
@@ -280,7 +348,7 @@ function CreateWoundPage() {
       setLocation(`/wounds/${wound.id}`);
     } catch { setFormError('We couldn’t save this record. Please try again.'); }
   }
-  return <PageFrame active="/wounds"><Link href="/wounds" className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={16} />Back to wounds</Link><div className="mx-auto mt-6 max-w-[680px]"><p className="eyebrow">New private record</p><h1 className="display mt-2 text-4xl font-extrabold">Start a wound record.</h1><p className="mt-3 leading-relaxed text-[hsl(var(--muted-foreground))]">Give it a name you’ll recognize and note where it is. You can add symptom details in your first update next.</p>
+  return <PageFrame active="/wounds"><Link href="/wounds" className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={16} />Back to wounds</Link><div className="mx-auto mt-6 max-w-[680px]"><p className="eyebrow">New private record</p><h1 className="display mt-2 text-4xl font-extrabold">Start a wound record.</h1><p className="mt-3 leading-relaxed text-[hsl(var(--muted-foreground))]">Give it a name you’ll recognize and note where it is. After creating the record, choose “Add update” to record symptoms, attach private photos, or describe changes by voice.</p>
     <form onSubmit={submit} className="surface mt-7 space-y-5 p-5 md:p-7">
       <div><label className="label" htmlFor="wound-name">Name for this record</label><input id="wound-name" className="field" placeholder="For example, small cut on my hand" maxLength={100} value={name} onChange={e => setName(e.target.value)} required data-testid="input-wound-name" /></div>
       <div><label className="label" htmlFor="body-site">Body area</label><input id="body-site" className="field" placeholder="For example, left forearm" maxLength={100} value={bodySite} onChange={e => setBodySite(e.target.value)} required data-testid="input-body-site" /></div>
@@ -308,9 +376,9 @@ function WoundDetailPage() {
       <div className="mt-5 flex flex-col justify-between gap-5 border-b border-[hsl(var(--border))] pb-7 sm:flex-row sm:items-end"><div><p className="eyebrow">Wound record · created {dateFormat(woundQuery.data.createdAt)}</p><h1 className="display mt-2 text-4xl font-extrabold md:text-5xl">{woundQuery.data.name}</h1><p className="mt-2 flex items-center gap-2 text-[hsl(var(--muted-foreground))]"><MapPin size={16} />{woundQuery.data.bodySite}</p></div><div className="flex flex-wrap gap-2"><Button className="btn-soft" onClick={() => setShowShare(v => !v)} data-testid="button-share-report"><Shield size={16} />Share report</Button><Button className="btn-primary" onClick={() => setShowUpdate(v => !v)} data-testid="button-add-update"><Plus size={16} />Add update</Button></div></div>
       {showUpdate && <UpdateForm woundId={id} onClose={() => setShowUpdate(false)} />}
       {showShare && <ShareForm woundId={id} onClose={() => setShowShare(false)} />}
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]"><section><div className="flex items-baseline justify-between"><div><p className="eyebrow">Over time</p><h2 className="display mt-1 text-2xl font-bold">Update history</h2></div><span className="text-xs text-[hsl(var(--muted-foreground))]">{updatesQuery.data?.length ?? 0} entries</span></div>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]"><section><div className="flex items-baseline justify-between"><div><p className="eyebrow">Over time</p><h2 className="display mt-1 text-2xl font-bold">Update history</h2></div><span className="text-xs text-[hsl(var(--muted-foreground))]">{updatesQuery.data?.length ?? 0} entries</span></div>
         <div className="mt-5">{updatesQuery.isLoading && <LoadingBlock rows={2} />}{updatesQuery.isError && <QueryError retry={() => void updatesQuery.refetch()} />}{updatesQuery.isSuccess && updatesQuery.data.length === 0 && <EmptyState title="No updates yet." body="Add what you’re noticing today. Future entries will build your private timeline." action={<Button className="btn-primary" onClick={() => setShowUpdate(true)}><Plus size={16} />Add first update</Button>} />}{updatesQuery.isSuccess && updatesQuery.data.length > 0 && <div className="relative space-y-4 before:absolute before:bottom-8 before:left-[11px] before:top-5 before:w-px before:bg-[#d8e3dc]">{updatesQuery.data.map(update => <UpdateCard update={update} key={update.id} />)}</div>}</div>
-      </section><aside className="h-fit rounded-2xl bg-[#e9efea] p-5"><div className="flex items-center gap-2 font-bold"><ShieldCheck size={18} className="text-[hsl(var(--primary))]" />About symptom prompts</div><p className="mt-3 text-sm leading-relaxed text-[#5f706a]">Any risk prompt shown here is based only on recorded symptoms. It is not a diagnosis, and absence of a prompt does not mean a wound is safe.</p><p className="mt-3 text-sm leading-relaxed text-[#5f706a]">If you feel concerned or symptoms are changing, contact a healthcare professional. Seek emergency care for urgent symptoms.</p></aside></div>
+      </section><aside className="h-fit"><WoundCareGuidance /></aside></div>
     </div>}
   </PageFrame>;
 }
@@ -318,7 +386,7 @@ function WoundDetailPage() {
 function UpdateCard({ update }: { update: import('@workspace/api-client-react').WoundUpdate }) {
   const flags = [update.fever && 'Fever', update.bleeding && 'Bleeding', update.odor && 'Odor', update.rapidWorsening && 'Rapid worsening'].filter((flag): flag is string => Boolean(flag));
   return <article className="surface relative ml-7 p-5" data-testid={`card-update-${update.id}`}><span className="absolute -left-[34px] top-6 h-[14px] w-[14px] rounded-full border-[3px] border-[#2c6d64] bg-[hsl(var(--background))]" />
-    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="font-mono text-xs text-[hsl(var(--muted-foreground))]">{dateTimeFormat(update.createdAt)}</div><div className="mt-2"><RiskBadge level={update.riskLevel} /></div></div><div className="text-sm font-semibold">Pain: {update.painLevel}/10</div></div>
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="font-mono text-xs text-[hsl(var(--muted-foreground))]">{dateTimeFormat(update.createdAt)}</div><div className="mt-2"><RiskBadge level={update.riskLevel} /><RiskNextStep level={update.riskLevel} /></div></div><div className="text-sm font-semibold">Pain: {update.painLevel}/10</div></div>
     <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3"><SymptomItem label="Swelling" value={update.swelling} /><SymptomItem label="Redness" value={update.redness} /><SymptomItem label="Discharge" value={update.discharge} /></div>
     {flags.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{flags.map(flag => <span className="rounded-full bg-[#f6e5e1] px-2.5 py-1 text-xs font-semibold text-[#963e37]" key={flag}>{flag}</span>)}</div>}
     {update.riskReasons.length > 0 && <div className="mt-4 rounded-lg bg-[#f7f4ed] p-3"><p className="text-xs font-bold">Why this prompt appeared</p><ul className="mt-1 list-inside list-disc text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">{update.riskReasons.map((reason, i) => <li key={i}>{reason}</li>)}</ul><p className="mt-2 text-[10px] leading-relaxed text-[hsl(var(--muted-foreground))]">This symptom-based prompt is not a medical assessment.</p></div>}
@@ -341,6 +409,9 @@ function UpdateForm({ woundId, onClose }: { woundId: number; onClose: () => void
   const queryClient = useQueryClient();
   const create = useCreateWoundUpdate();
   const requestUpload = useRequestUploadUrl();
+  const photoPickerRef = useRef<HTMLInputElement>(null);
+  const cameraPickerRef = useRef<HTMLInputElement>(null);
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const [painLevel, setPainLevel] = useState(0);
   const [swelling, setSwelling] = useState<SymptomLevel>('unknown');
   const [redness, setRedness] = useState<SymptomLevel>('unknown');
@@ -350,9 +421,95 @@ function UpdateForm({ woundId, onClose }: { woundId: number; onClose: () => void
   const [odor, setOdor] = useState(false);
   const [rapidWorsening, setRapidWorsening] = useState(false);
   const [notes, setNotes] = useState('');
+  const [dictatedText, setDictatedText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<{ file: File; url: string }[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  const [speechMessage, setSpeechMessage] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const previews = files.map(file => ({ file, url: URL.createObjectURL(file) }));
+    setPhotoPreviews(previews);
+    return () => previews.forEach(preview => URL.revokeObjectURL(preview.url));
+  }, [files]);
+  useEffect(() => () => speechRecognitionRef.current?.stop(), []);
+
+  function addPhotos(selected: File[]) {
+    if (selected.length === 0) return;
+    const remaining = Math.max(0, 3 - files.length);
+    setFiles(current => [...current, ...selected].slice(0, 3));
+    if (selected.length > remaining) setError('You can attach up to three photos. Extra selections were not added.');
+    else if (selected.some(file => file.size > 10 * 1024 * 1024)) setError('Each photo must be 10 MB or smaller.');
+    else if (selected.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) setError('Choose a JPEG, PNG, or WebP photo.');
+    else setError('');
+  }
+
+  function toggleVoiceInput() {
+    if (isListening) {
+      speechRecognitionRef.current?.stop();
+      setIsListening(false);
+      setSpeechMessage('Voice input stopped.');
+      return;
+    }
+    const browserWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const SpeechRecognitionAPI = browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      setSpeechMessage('Voice typing is not supported by this browser. You can type in the notes box instead.');
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.lang = navigator.language || 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = event => {
+        let finalText = '';
+        let interimText = '';
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          if (!result) continue;
+          if (result.isFinal) finalText += result[0].transcript;
+          else interimText += result[0].transcript;
+        }
+        const cleanedFinal = finalText.trim();
+        const acceptedText = cleanedFinal.slice(0, Math.max(0, 3000 - notes.length));
+        if (acceptedText) {
+          setNotes(current => `${current.trimEnd()}${current.trim() ? ' ' : ''}${acceptedText}`.slice(0, 3000));
+          setDictatedText(current => `${current.trimEnd()}${current.trim() ? ' ' : ''}${acceptedText}`.slice(0, 3000));
+        }
+        if (interimText.trim()) setSpeechMessage(`Listening: ${interimText.trim()}`);
+        else if (acceptedText) setSpeechMessage('Words added to your notes.');
+        else if (cleanedFinal) setSpeechMessage('Your notes are full. Remove some text before dictating more.');
+      };
+      recognition.onerror = event => {
+        setIsListening(false);
+        const message = event.error === 'not-allowed' || event.error === 'service-not-allowed'
+          ? 'Microphone access was blocked. Allow microphone access in your browser settings, or type your notes.'
+          : event.error === 'no-speech'
+            ? 'No speech was detected. Try again or type your notes.'
+            : 'Voice input stopped. You can continue typing your notes.';
+        setSpeechMessage(message);
+      };
+      recognition.onend = () => {
+        setIsListening(false);
+        speechRecognitionRef.current = null;
+      };
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+      setSpeechMessage('Listening. Speak clearly, then select Stop voice typing.');
+    } catch {
+      speechRecognitionRef.current = null;
+      setIsListening(false);
+      setSpeechMessage('Voice input could not start. Check microphone permission or type your notes.');
+    }
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault(); setError(''); setSaved(false);
     try {
@@ -367,7 +524,7 @@ function UpdateForm({ woundId, onClose }: { woundId: number; onClose: () => void
         if (!response.ok) throw new Error('upload');
         imagePaths.push(signed.objectPath);
       }
-      const payload: WoundUpdateInput = { painLevel, swelling, redness, discharge, bleeding, fever, odor, rapidWorsening, notes: notes.trim() || null, imagePaths };
+      const payload: WoundUpdateInput = { painLevel, swelling, redness, discharge, bleeding, fever, odor, rapidWorsening, notes: notes.trim() || null, transcription: dictatedText.trim() || null, imagePaths };
       await create.mutateAsync({ id: woundId, data: payload });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getListWoundUpdatesQueryKey(woundId) }),
@@ -394,8 +551,28 @@ function UpdateForm({ woundId, onClose }: { woundId: number; onClose: () => void
       return <div key={String(label)}><label className="label" htmlFor={`symptom-${key}`}>{String(label)}</label><select id={`symptom-${key}`} className="field" value={value as string} onChange={e => (setter as (v: SymptomLevel) => void)(e.target.value as SymptomLevel)} data-testid={`select-${key}`}>{symptomOptions.map(option => <option value={option} key={option}>{symptomLabel[option]}</option>)}</select></div>;
     })}</div>
     <fieldset><legend className="label">Other changes you’ve noticed</legend><div className="grid gap-2 sm:grid-cols-2">{[['Bleeding', bleeding, setBleeding], ['Fever', fever, setFever], ['Odor', odor, setOdor], ['Rapid worsening', rapidWorsening, setRapidWorsening]].map(([label, checked, setter]) => <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-3 text-sm" key={String(label)}><input className="h-4 w-4 accent-[#2c6d64]" type="checkbox" checked={checked as boolean} onChange={e => (setter as (v: boolean) => void)(e.target.checked)} data-testid={`check-${String(label).toLowerCase().replaceAll(' ', '-')}`} />{String(label)}</label>)}</div></fieldset>
-    <div><div className="flex items-center justify-between"><label className="label mb-0" htmlFor="update-notes">Notes</label><span className="font-mono text-[10px] text-[hsl(var(--muted-foreground))]">{notes.length}/3000</span></div><textarea id="update-notes" className="field mt-2 min-h-28 resize-y" maxLength={3000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything else you’d like to remember?" data-testid="input-update-notes" /><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Voice transcription is unavailable. You can enter notes here.</p></div>
-    <div><label className="label" htmlFor="update-images">Private photos <span className="font-normal text-[hsl(var(--muted-foreground))]">(optional, up to 3)</span></label><input id="update-images" type="file" accept="image/jpeg,image/png,image/webp" multiple className="field h-auto py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--secondary))] file:px-3 file:py-1.5 file:text-xs file:font-bold" onChange={e => { const next = Array.from(e.target.files ?? []); setFiles(next.slice(0, 3)); }} data-testid="input-update-images" /><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">JPEG, PNG, or WebP; each photo must be 10 MB or smaller. Photos are not analyzed.</p>{files.length > 0 && <p className="mt-2 text-xs font-semibold text-[hsl(var(--primary))]">{files.length} photo{files.length > 1 ? 's' : ''} selected</p>}</div>
+    <div>
+      <div className="flex items-center justify-between gap-3"><label className="label mb-0" htmlFor="update-notes">Notes</label><span className="font-mono text-[10px] text-[hsl(var(--muted-foreground))]">{notes.length}/3000</span></div>
+      <textarea id="update-notes" className="field mt-2 min-h-28 resize-y" maxLength={3000} value={notes} onChange={e => { setNotes(e.target.value); setDictatedText(''); }} placeholder="Anything else you’d like to remember?" data-testid="input-update-notes" />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button type="button" className={isListening ? 'btn-primary' : 'btn-soft'} onClick={toggleVoiceInput} disabled={pending} aria-pressed={isListening} data-testid="button-voice-notes">
+          {isListening ? <MicOff size={16} /> : <Mic size={16} />}{isListening ? 'Stop voice typing' : 'Explain by voice'}
+        </Button>
+        {dictatedText && <span className="self-center text-xs text-[hsl(var(--muted-foreground))]">Dictated words are editable above.</span>}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">Voice typing depends on browser support and microphone permission. Your browser may process speech using its speech service; this app saves the transcript, not an audio recording.</p>
+      {speechMessage && <p className="mt-1 text-xs text-[hsl(var(--primary))]" role="status" aria-live="polite">{speechMessage}</p>}
+    </div>
+    <div>
+      <div><p className="label mb-1">Add wound photos <span className="font-normal text-[hsl(var(--muted-foreground))]">(optional, up to 3)</span></p><p id="photo-help" className="text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">JPEG, PNG, or WebP. Each image must be 10 MB or smaller. Photos are private and are not analyzed.</p></div>
+      <input ref={photoPickerRef} id="update-images" type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" tabIndex={-1} aria-label="Choose wound photos" aria-describedby="photo-help" onChange={e => { addPhotos(Array.from(e.target.files ?? [])); e.currentTarget.value = ''; }} data-testid="input-update-images" />
+      <input ref={cameraPickerRef} id="capture-image" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" tabIndex={-1} aria-label="Take a wound photo with your camera" aria-describedby="photo-help" onChange={e => { addPhotos(Array.from(e.target.files ?? [])); e.currentTarget.value = ''; }} />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" className="btn-soft" onClick={() => photoPickerRef.current?.click()} aria-controls="update-images" data-testid="button-choose-photos"><ImagePlus size={17} />Choose photos</Button>
+        <Button type="button" className="btn-soft" onClick={() => cameraPickerRef.current?.click()} aria-controls="capture-image" data-testid="button-take-photo"><Camera size={17} />Take a photo</Button>
+      </div>
+      {photoPreviews.length > 0 && <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2" aria-live="polite">{photoPreviews.map(({ file, url }, index) => <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[hsl(var(--border))] p-2" key={`${file.name}-${file.lastModified}-${index}`}><img src={url} alt={`Preview of ${file.name}`} className="h-14 w-14 shrink-0 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-xs font-medium" title={file.name}>{file.name}</span><Button type="button" className="btn-text min-h-9 px-2 text-[#963e37]" onClick={() => setFiles(current => current.filter((_, photoIndex) => photoIndex !== index))} aria-label={`Remove ${file.name}`}><X size={17} /></Button></div>)}</div>}
+    </div>
     <div className="rounded-xl bg-[#f7f1e5] p-4 text-xs leading-relaxed text-[#735c3e]"><b>Not medical advice.</b> Symptom prompts are limited decision-support based on your entries and cannot assess a wound or replace professional care.</div>
     {error && <p role="alert" className="text-sm font-semibold text-[#a64239]">{error}</p>}
     <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row"><Button type="button" className="btn-soft" onClick={onClose}>Cancel</Button><Button type="submit" className="btn-primary" disabled={pending} data-testid="button-submit-update">{pending ? 'Saving securely…' : 'Save update'} <ArrowRight size={16} /></Button></div>
